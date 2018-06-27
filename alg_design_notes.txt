@@ -1,0 +1,14 @@
+Notes
+Easy part: getting data and writing them 3 rows of memory. Takes 2 cycles.
+Hard part: the actual calculation
+will need three mem blocks
+Problems:
+1. How to read and store the data efficiently and quickly
+2. How to perform the calculations efficiently and quicky
+idea
+we'll have a 3x3 signal array that holds our convolution matrix
+the signal array will always hold the other 8 pixels required to perform our calculations 
+when a new byte arrives, it gets saved into index (3,3) of our signal array and the memory simultaneously, we can then perform the required edge detection calculations in parallel with the new byte being written to the memory
+before we are ready to take a new byte, we first "shift" our columns in the 3x3 memory to the left by one (we can do this by treating column 1 as our new column 0 and so forth) and read our memory to retreive the new bytes for our next column in save that in our new column 3 of our signal array.
+Therefore we should only require 1 cycle to read from our memory each time we obtain a new byte until completion
+***extra note****: initially we will be reading bytes of memory only until we reach the byte that represents row 3 and column 3 of our image. So our signal array will just hold bytes 1,2,3 for the first two rows of pixels and bytes and our third row will contain bytes 1 and 2 until that byte arrives 
