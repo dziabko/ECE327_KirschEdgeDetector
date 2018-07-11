@@ -15,7 +15,7 @@ entity three_x_sum is
     clk        : in std_logic
   );
 end entity;
-architecture main of three_x_sum is 
+architecture sum_val of three_x_sum is 
   signal sum	: unsigned (13 downto 0);
 begin
   process is
