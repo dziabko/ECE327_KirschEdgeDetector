@@ -331,7 +331,7 @@ begin
 	begin
 	wait until rising_edge(clk);
 	if (reset= '1') then
-		i_sel <= (others => '0');
+		i_sel <= (others => '1');
 	else
 		case i_sel is 
 			when "000" =>
