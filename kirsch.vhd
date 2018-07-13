@@ -210,8 +210,7 @@ begin
 	  else
 		--Need shift i_sel left
 		--i_sel depicts how far along the inputs are along the stage
-		i_sel <= i_sel sll 1;
-		i_sel(0) <= i_valid;
+		i_sel <= i_sel(6 downto 0) & i_valid;
 		o_done <= i_sel(7);
 	  end if;
 	end process;
