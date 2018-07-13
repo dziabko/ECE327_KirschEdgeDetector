@@ -10,32 +10,35 @@ use work.kirsch_synth_pkg.all;
 entity three_x_sum is 
   port(
     i_val      : in unsigned (8 downto 0);
-    i_multiply : in std_logic;
+    i_mux_sel_a  : in std_logic; --'1' selects o_result*2 '0' selects i_val
+    i_mux_sel_b  : in std_logic; --'1' selects i_val from previous cycle '0' selects result;
     i_reset    : in std_logic;
-    i_clear    : in std_logic;
     o_result   : out unsigned (12 downto 0);
- --   o_overflow : out std_logic;
     clk        : in std_logic
   );
 end entity;
 architecture sum_val of three_x_sum is 
   signal sum	: unsigned (12 downto 0);
+  signal i_val_prev : unsigned (8 downto 0);
 begin
   process is
+  variable op_a unsigned (12 downto 0);
+  variable op_b unsigned (12 downto 0);
   begin 
   wait until rising_edge(clk);
-  if (i_reset = '1' OR i_clear = '1') then
+  i_val_prev <= i_val;
+  if (i_reset = '1') then
       sum <= (others => '0');
+      i_val_prev <= (others => '0');
+      op_a <= (others => '0');
+      op_b <= (others => '0');
   else
-      if (i_multiply='1') then
-          sum <= sum + shift_left(sum, 1);
-      else
-      	  sum <= sum + ("0000" & i_val);
-      end if;
+      op_a <= shift_left(sum, 1)  when i_mux_sel_a = '1' else i_val;
+      op_b <= "0000" & i_val_prev when i_mux_sel_b = '1' else sum;
+      sum <= op_a + op_b;
   end if;
   end process;
   o_result <= sum;
---  o_overflow <= sum (13);
 end architecture;
 
 library ieee;
