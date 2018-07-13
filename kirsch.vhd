@@ -221,8 +221,8 @@ begin
 			when "101" =>
 			i_sel <= "110";
 			when "110" => 
-			o_done <= '1';
 			i_sel <= "111";
+			o_done <= '1';
 			when others =>
 			i_sel <= "000";
 		end case;
@@ -231,7 +231,7 @@ begin
 
 	set_outputs : process
 	begin
-	wait until rising_edge(clk);
+	--wait until rising_edge(clk);
 	if (reset = '1' or clear = '1') then
 		o_edge <= '0';
 		o_edge_max <= (others => '0');
@@ -472,55 +472,6 @@ begin
 	  -------------------------------------------------------------------------------------------------
 	  -- Check the one hot encoding, and fill the convolution matrix
 	  if (i_valid='1') then
-	  
-	    -- if (row >=2) then
-		  -- if (col_first="001") then
-		    -- if (wr_en="100") then
-		      -- col1(0) <= mem1_out; --Input first row
-		      -- col1(1) <= mem2_out; -- input middle row
-		      -- col1(2) <= i_pixel; -- input last row
-			-- elsif (wr_en="010") then
-		      -- col1(0) <= mem1_out; --Input first row
-		      -- col1(1) <= i_pixel; -- input middle row
-		      -- col1(2) <= mem3_out; -- input last row
-			-- elsif (wr_en="001") then
-		      -- col1(0) <= i_pixel; --Input first row
-		      -- col1(1) <= mem2_out; -- input middle row
-		      -- col1(2) <= mem3_out; -- input last row
-			-- end if;
-		  -- elsif (col_first="010") then
-		    -- if (wr_en="100") then
-		      -- col2(0) <= mem1_out; --Input first row
-		      -- col2(1) <= mem2_out; -- input middle row
-		      -- col2(2) <= i_pixel; -- input last row
-			-- elsif (wr_en="010") then
-		      -- col2(0) <= mem1_out; --Input first row
-		      -- col2(1) <= i_pixel; -- input middle row
-		      -- col2(2) <= mem3_out; -- input last row			  
-			-- elsif (wr_en="001") then
-		      -- col2(0) <= i_pixel; --Input first row
-		      -- col2(1) <= mem2_out; -- input middle row
-		      -- col2(2) <= mem3_out; -- input last row
-			-- end if;
-		  -- elsif (col_first="100") then
-		    -- if (wr_en="100") then
-		      -- col3(0) <= mem1_out; --Input first row
-		      -- col3(1) <= mem2_out; -- input middle row
-		      -- col3(2) <= i_pixel; -- input last row
-			-- elsif (wr_en="010") then
-		      -- col3(0) <= mem1_out; --Input first row
-		      -- col3(1) <= i_pixel; -- input middle row
-		      -- col3(2) <= mem3_out; -- input last row			  
-			-- elsif (wr_en="001") then
-		      -- col3(0) <= i_pixel; --Input first row
-		      -- col3(1) <= mem2_out; -- input middle row
-		      -- col3(2) <= mem3_out; -- input last row
-			-- end if;
-		  -- end if;
-		  
-		-- end if;
-		
-		
 		-- Shift values of matrix
 		--1st col
 		a <= b;
@@ -589,8 +540,8 @@ begin
   
   --Assign row and column ports
   o_mode <= mode;
-  o_row <= current_row;
-  o_col <= current_address;
+  o_row <= current_row - 1 when (current_row > 0) else (others => '0');
+  o_col <= current_address - 1 when (current_address > 0) else (others => '0');
   o_valid <= edge_done;
     
 end architecture;
