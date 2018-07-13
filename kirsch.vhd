@@ -26,7 +26,6 @@ begin
   wait until rising_edge(clk);
   if (i_reset = '1' OR i_clear = '1') then
       sum <= (others => '0');
-      o_overflow <= '0';
   else
       if (i_multiply='1') then
           sum <= sum + shift_left(sum, 1);
@@ -125,6 +124,7 @@ begin
 	  else
 	    o_edgeMax <= (others=>'0');
 		o_edge <= '0';
+		o_dir <= dir_e;
 	  end if;
 	end if;
   end process;
@@ -162,6 +162,9 @@ signal mul_en: std_logic;
 signal sum_all_overflow : std_logic;
 signal max_dir_final : direction_ty;
 signal max_val_final : unsigned (9 downto 0);
+signal res_edge : std_logic;
+signal res_edge_max : signed (12 downto 0);
+signal res_dir : direction_ty;
 begin
 	op_sum_all : entity work.three_x_sum(sum_val)
 	port map (
@@ -191,9 +194,9 @@ begin
 		i_sum_of_all => sum_all_inputs,
 		i_max_of_sum => max_val_final,
 		in_dir => max_dir_final,
-		o_edgeMax => o_edge_max,
-		o_edge => o_edge,
-		o_dir => o_dir
+		o_edgeMax => res_edge_max,
+		o_edge => res_edge,
+		o_dir => res_dir
 		);
 
 	cycle_states: process 
@@ -224,6 +227,20 @@ begin
 			i_sel <= "000";
 		end case;
 	  end if;
+	end process;
+
+	set_outputs : process
+	begin
+	wait until rising_edge(clk);
+	if (reset = '1' or clear = '1') then
+		o_edge <= '0';
+		o_edge_max <= (others => '0');
+		o_dir <= dir_e;
+	elsif (o_done = '1') then
+		o_edge <= res_edge;
+		o_edge_max <= res_edge_max;
+		o_dir <= res_dir;
+	end if;
 	end process;
 	
 	clear_feedback_registers : process
@@ -317,7 +334,7 @@ begin
 		else
 			mul_en <= '0';
 		end if; 
-	end process;		
+	end process;	
 end architecture;
 --------------------------------------------------END EDGE DETECTION--------------------------------------------------
 
@@ -348,11 +365,12 @@ end entity;
 
 architecture main of kirsch is
 signal edge_done : std_logic;
---Row and address of our image
+--row and address of our image
 signal address  : unsigned (7 downto 0);
-signal row 		: unsigned (7 downto 0);
-
-
+signal row 	: unsigned (7 downto 0);
+signal current_address : unsigned (7 downto 0);
+signal current_row : unsigned (7 downto 0);
+signal mode : mode_ty;
 -- Write enabled to write to mem
 signal wr_en : std_logic_vector (2 downto 0);
 
@@ -362,7 +380,7 @@ signal mem2_out : unsigned(7 downto 0);
 signal mem3_out : unsigned(7 downto 0);
 
 -- One hot encoding for col input
-signal col_first : std_logic_vector(2 downto 0) := "001";
+--signal col_first : std_logic_vector(2 downto 0) := "001";
 
 --Temp o_edge_max
 signal o_edge_max : signed(12 downto 0);
@@ -415,7 +433,18 @@ begin
 		i_en => dfd_start,
 		o_done => edge_done
 	  );
-  
+  set_o_mode : process
+  begin
+   wait until rising_edge(clk);
+   if (reset = '1') then
+    mode <= m_reset;
+   elsif (dfd_start = '1') then
+    mode <= m_busy;
+   elsif (o_valid <= '1' OR (reset = '0' AND mode = m_reset)) then
+    mode <= m_idle;
+   end if;
+  end process;
+ 
   
   kirsch_edgedetector : process(clk, reset)
   begin
@@ -526,7 +555,8 @@ begin
 
 		-- Shift the one hot encoder left by 1 for next input
 		--col_first <= col_first(1 downto 0) & col_first(2);
-		 
+		current_address <= address;
+		current_row <= row; 
 		--Set next address for next input, and check for column
 		if (address<255) then
 		  address <= address + 1;
@@ -558,11 +588,9 @@ begin
   end process;
   
   --Assign row and column ports
-  o_mode <= m_busy when (dfd_start='1') else
-			m_reset when (reset='1') else
-			m_idle when (o_valid='1');
-  o_row <= row;
-  o_col <= address;
+  o_mode <= mode;
+  o_row <= current_row;
+  o_col <= current_address;
   o_valid <= edge_done;
     
 end architecture;
