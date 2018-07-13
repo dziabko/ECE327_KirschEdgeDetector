@@ -14,12 +14,12 @@ entity three_x_sum is
     i_reset    : in std_logic;
     i_clear    : in std_logic;
     o_result   : out unsigned (12 downto 0);
-    o_overflow : out std_logic;
+ --   o_overflow : out std_logic;
     clk        : in std_logic
   );
 end entity;
 architecture sum_val of three_x_sum is 
-  signal sum	: unsigned (13 downto 0);
+  signal sum	: unsigned (12 downto 0);
 begin
   process is
   begin 
@@ -30,12 +30,12 @@ begin
       if (i_multiply='1') then
           sum <= sum + shift_left(sum, 1);
       else
-      	  sum <= sum + ("00000" & i_val);
+      	  sum <= sum + ("0000" & i_val);
       end if;
   end if;
   end process;
-  o_result <= sum(12 downto 0);
-  o_overflow <= sum (13);
+  o_result <= sum;
+--  o_overflow <= sum (13);
 end architecture;
 
 library ieee;
@@ -93,6 +93,7 @@ entity kirsch_edgecalc is
 	reset			: in std_logic;
 	i_sum_of_all		: in unsigned(12 downto 0);
 	i_max_of_sum		: in unsigned(9 downto 0);
+	i_hold_out		: in std_logic;
 	in_dir 		 	: in direction_ty;
 	o_edgeMax		: out signed(12 downto 0);
 	o_edge			: out std_logic;
@@ -109,7 +110,8 @@ begin
     if (reset='1') then
 	o_edge <= '0';
 	o_edgeMax <= (others=>'0');
-	elsif(clk'EVENT and clk='1') then
+	o_dir <= dir_e;
+	elsif(clk'EVENT and clk='1' AND i_hold_out = '0') then
 	  -- First shift the bottom input
 	  max_sum_x8 :=  shift_left("000" & i_max_of_sum, 3);
 	  
@@ -159,12 +161,8 @@ signal sum_all_inputs : unsigned (12 downto 0);
 signal max_dir_inter : direction_ty;
 signal max_val_inter : unsigned (7 downto 0);
 signal mul_en: std_logic;
-signal sum_all_overflow : std_logic;
 signal max_dir_final : direction_ty;
 signal max_val_final : unsigned (9 downto 0);
-signal res_edge : std_logic;
-signal res_edge_max : signed (12 downto 0);
-signal res_dir : direction_ty;
 begin
 	op_sum_all : entity work.three_x_sum(sum_val)
 	port map (
@@ -173,7 +171,6 @@ begin
 		i_multiply => mul_en,
 		i_val => sum_1,
 		o_result => sum_all_inputs,
-		o_overflow => sum_all_overflow,
 		clk => clk
 		);
 	op_get_max : entity work.kirsch_maxfinal(finalMax)
@@ -194,9 +191,10 @@ begin
 		i_sum_of_all => sum_all_inputs,
 		i_max_of_sum => max_val_final,
 		in_dir => max_dir_final,
-		o_edgeMax => res_edge_max,
-		o_edge => res_edge,
-		o_dir => res_dir
+		i_hold_out => o_done,
+		o_edgeMax => o_edge_max,
+		o_edge => o_edge,
+		o_dir => o_dir
 		);
 
 	cycle_states: process 
@@ -208,7 +206,6 @@ begin
 	  else
 		case i_sel is 
 			when "000" =>
-			o_done <= '0' when i_en = '1';
 			i_sel <= "001" when i_en = '1';
 			when "001" =>
 			i_sel <= "010";
@@ -224,25 +221,12 @@ begin
 			i_sel <= "111";
 			o_done <= '1';
 			when others =>
+			o_done <= '0';
 			i_sel <= "000";
 		end case;
 	  end if;
 	end process;
 
-	set_outputs : process
-	begin
-	--wait until rising_edge(clk);
-	if (reset = '1' or clear = '1') then
-		o_edge <= '0';
-		o_edge_max <= (others => '0');
-		o_dir <= dir_e;
-	elsif (o_done = '1') then
-		o_edge <= res_edge;
-		o_edge_max <= res_edge_max;
-		o_dir <= res_dir;
-	end if;
-	end process;
-	
 	clear_feedback_registers : process
 	begin
 	wait until rising_edge(clk);
@@ -455,10 +439,7 @@ begin
 	  wr_en <= "001";
 	  address <= (others => '0');
 	  row <= (others => '0');
-	  -- col1(0) <= to_unsigned(0, col1(0)'LENGTH);
-	  -- col1(1) <= to_unsigned(0, col1(1)'LENGTH);
-	  -- col1(2) <= to_unsigned(0, col1(2)'LENGTH);
-	  
+
 	  a <= (others => '0');
 	  b <= (others => '0');
 	  c <= (others => '0');
@@ -505,7 +486,6 @@ begin
 		  ---------------------------------------------------------------------------------------------
 
 		-- Shift the one hot encoder left by 1 for next input
-		--col_first <= col_first(1 downto 0) & col_first(2);
 		current_address <= address;
 		current_row <= row; 
 		--Set next address for next input, and check for column
@@ -518,7 +498,6 @@ begin
 		elsif (address=255 and row<255) then --Last column, and not finished the last row
 		  address <= (others => '0');
 		  row <= row + 1;
-		  --col_first <= "001";
 		  wr_en <= wr_en(1 downto 0) & wr_en(2);
 		end if;
 		
