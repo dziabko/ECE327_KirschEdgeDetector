@@ -9,11 +9,11 @@ use work.kirsch_synth_pkg.all;
 
 entity three_x_sum is 
   port(
-    i_val      : in unsigned ( 8 downto 0);
+    i_val      : in unsigned (8 downto 0);
     i_multiply : in std_logic;
     i_reset    : in std_logic;
     i_clear    : in std_logic;
-    o_result   : out unsigned ( 12 downto 0);
+    o_result   : out unsigned (12 downto 0);
     o_overflow : out std_logic;
     clk        : in std_logic
   );
@@ -28,10 +28,10 @@ begin
       sum <= (others => '0');
       o_overflow <= '0';
   else
-      if (i_multiply <= '1') then
-          sum <= sum + shift_left (sum, 1);
+      if (i_multiply='1') then
+          sum <= sum + shift_left(sum, 1);
       else
-      	  sum <= sum + i_val;
+      	  sum <= sum + ("00000" & i_val);
       end if;
   end if;
   end process;
@@ -67,8 +67,8 @@ begin
   variable sum : unsigned (9 downto 0); 
   begin
     if (reset='1' OR i_clear = '1') then
-	max_a <= (others => '0');
-	max_dir <= (others => '0');
+	  max_a <= (others => '0');
+	  max_dir <= (others => '0');
     elsif(clk'EVENT and clk='1') then
 	  sum := ("0"&i_a) + ("00"&i_b);
 	  if ( sum > max_a ) then
@@ -118,7 +118,7 @@ begin
 	  final_edgecalc := signed(max_sum_x8) - signed(i_sum_of_all);
 	  
 	  -- Check if the final edge value is greater than 383 and set o_edge
-	  if (final_edgecalc < 383) then
+	  if (final_edgecalc > 383) then
 	    o_edgeMax <= final_edgecalc;
 		o_edge <= '1';
 		o_dir <= in_dir;
@@ -146,8 +146,9 @@ entity kirsch_edge_detector is
 	a,b,c,d,e,f,g,h	: in unsigned (7 downto 0);
 	o_edge		: out std_logic;
 	o_edge_max	: out signed (12 downto 0);
-	o_dir		: out direction_ty
-      );
+	o_dir		: out direction_ty;
+	o_done		: out std_logic
+     );
 end entity;
 
 architecture main_edge_detect of kirsch_edge_detector is 
@@ -193,17 +194,19 @@ begin
 		o_edgeMax => o_edge_max,
 		o_edge => o_edge,
 		o_dir => o_dir
-		);	
+		);
 
 	cycle_states: process 
 	begin
 	wait until rising_edge(clk);
-	if (reset= '1') then
-		i_sel <= (others => '1');
-	else
+	  if (reset= '1') then
+		o_done <= '0';
+		i_sel <= (others => '0');
+	  else
 		case i_sel is 
 			when "000" =>
-			i_sel <= "001";
+			o_done <= '0' when i_en = '1';
+			i_sel <= "001" when i_en = '1';
 			when "001" =>
 			i_sel <= "010";
 			when "010" =>
@@ -215,11 +218,12 @@ begin
 			when "101" =>
 			i_sel <= "110";
 			when "110" => 
+			o_done <= '1';
 			i_sel <= "111";
 			when others =>
-			i_sel <= "000" when i_en = '1';
+			i_sel <= "000";
 		end case;
-	end if;
+	  end if;
 	end process;
 	
 	clear_feedback_registers : process
@@ -229,10 +233,10 @@ begin
 		clear <= '0';
 	else
 		case i_sel is
-			when "111" =>
-			clear <= '1';
+			when "000" =>
+			  clear <= '1' when i_en = '0' else '0';
 			when others =>
-			clear <= '0';
+			  clear <= '0';
 		end case;
 	end if;
 	end process;
@@ -308,7 +312,7 @@ begin
 	set_sum_all_mult_en : process
 	begin
 		wait until rising_edge(clk);
-		if (reset = '0' AND i_sel = "101") then
+		if (reset = '0' AND i_sel = "100") then
 			mul_en <= '1';
 		else
 			mul_en <= '0';
@@ -343,7 +347,7 @@ end entity;
 
 
 architecture main of kirsch is
-
+signal edge_done : std_logic;
 --Row and address of our image
 signal address  : unsigned (7 downto 0);
 signal row 		: unsigned (7 downto 0);
@@ -357,12 +361,6 @@ signal mem1_out : unsigned(7 downto 0);
 signal mem2_out : unsigned(7 downto 0);
 signal mem3_out : unsigned(7 downto 0);
 
--- Create a 3x3 matrix for convolution
-type column is array (2 downto 0) of unsigned(7 downto 0);
-signal col1 : column;
-signal col2 : column;
-signal col3 : column;
-
 -- One hot encoding for col input
 signal col_first : std_logic_vector(2 downto 0) := "001";
 
@@ -372,7 +370,7 @@ signal o_edge_max : signed(12 downto 0);
 -- Signal detect DFD start
 signal dfd_start : std_logic := '0';
 
-
+signal a,b,c,d,e,f,g,h,i : unsigned (7 downto 0);
 begin
 
   -- Create 3 instances of memory to hold the pixels
@@ -408,13 +406,14 @@ begin
 	  port map(
 	    clk => clk,
 		reset => reset,
-		a => col1(0), h => col1(1), g => col1(2),
-		b => col2(0), f => col2(2),
-		c => col3(0), d => col3(1), e => col3(2),
+		a => a, h => h, g => g,
+		b => b, f => f,
+		c => c, d => d, e => e,
 		o_edge => o_edge,
 		o_edge_max => o_edge_max,
 		o_dir => o_dir,
-		i_en => dfd_start
+		i_en => dfd_start,
+		o_done => edge_done
 	  );
   
   
@@ -423,89 +422,135 @@ begin
     if (reset='1') then
 	  dfd_start <= '0';
 	  
-	  o_valid <= '0';
 	  --Reset our wr_en, address, row
 	  wr_en <= "001";
 	  address <= (others => '0');
 	  row <= (others => '0');
-	  col1(0) <= to_unsigned(0, col1(0)'LENGTH);
-	  col1(1) <= to_unsigned(0, col1(1)'LENGTH);
-	  col1(2) <= to_unsigned(0, col1(2)'LENGTH);
+	  -- col1(0) <= to_unsigned(0, col1(0)'LENGTH);
+	  -- col1(1) <= to_unsigned(0, col1(1)'LENGTH);
+	  -- col1(2) <= to_unsigned(0, col1(2)'LENGTH);
 	  
+	  a <= (others => '0');
+	  b <= (others => '0');
+	  c <= (others => '0');
+	  d <= (others => '0');
+	  e <= (others => '0');
+	  f <= (others => '0');
+	  g <= (others => '0');
+	  h <= (others => '0');
+	  i <= (others => '0');
     elsif (clk'EVENT and clk='1') then
 	  -------------------------------------------------------------------------------------------------
 	  -- Check the one hot encoding, and fill the convolution matrix
 	  if (i_valid='1') then
 	  
-	    if (row >=2) then
-		  if (col_first="001") then
-		    if (wr_en="100") then
-		      col1(0) <= mem1_out; --Input first row
-		      col1(1) <= mem2_out; -- input middle row
-		      col1(2) <= i_pixel; -- input last row
-			elsif (wr_en="010") then
-		      col1(0) <= mem1_out; --Input first row
-		      col1(1) <= i_pixel; -- input middle row
-		      col1(2) <= mem3_out; -- input last row	
-			elsif (wr_en="001") then
-		      col1(0) <= i_pixel; --Input first row
-		      col1(1) <= mem2_out; -- input middle row
-		      col1(2) <= mem3_out; -- input last row
-			end if;
-		  elsif (col_first="010") then
-		    if (wr_en="100") then
-		      col2(0) <= mem1_out; --Input first row
-		      col2(1) <= mem2_out; -- input middle row
-		      col2(2) <= i_pixel; -- input last row
-			elsif (wr_en="010") then
-		      col2(0) <= mem1_out; --Input first row
-		      col2(1) <= i_pixel; -- input middle row
-		      col2(2) <= mem3_out; -- input last row	
-			elsif (wr_en="001") then
-		      col2(0) <= i_pixel; --Input first row
-		      col2(1) <= mem2_out; -- input middle row
-		      col2(2) <= mem3_out; -- input last row
-			end if;
-		  elsif (col_first="100") then
-		    if (wr_en="100") then
-		      col3(0) <= mem1_out; --Input first row
-		      col3(1) <= mem2_out; -- input middle row
-		      col3(2) <= i_pixel; -- input last row
-			elsif (wr_en="010") then
-		      col3(0) <= mem1_out; --Input first row
-		      col3(1) <= i_pixel; -- input middle row
-		      col3(2) <= mem3_out; -- input last row	
-			elsif (wr_en="001") then
-		      col3(0) <= i_pixel; --Input first row
-		      col3(1) <= mem2_out; -- input middle row
-		      col3(2) <= mem3_out; -- input last row
-			end if;
-		  end if;
+	    -- if (row >=2) then
+		  -- if (col_first="001") then
+		    -- if (wr_en="100") then
+		      -- col1(0) <= mem1_out; --Input first row
+		      -- col1(1) <= mem2_out; -- input middle row
+		      -- col1(2) <= i_pixel; -- input last row
+			-- elsif (wr_en="010") then
+		      -- col1(0) <= mem1_out; --Input first row
+		      -- col1(1) <= i_pixel; -- input middle row
+		      -- col1(2) <= mem3_out; -- input last row
+			-- elsif (wr_en="001") then
+		      -- col1(0) <= i_pixel; --Input first row
+		      -- col1(1) <= mem2_out; -- input middle row
+		      -- col1(2) <= mem3_out; -- input last row
+			-- end if;
+		  -- elsif (col_first="010") then
+		    -- if (wr_en="100") then
+		      -- col2(0) <= mem1_out; --Input first row
+		      -- col2(1) <= mem2_out; -- input middle row
+		      -- col2(2) <= i_pixel; -- input last row
+			-- elsif (wr_en="010") then
+		      -- col2(0) <= mem1_out; --Input first row
+		      -- col2(1) <= i_pixel; -- input middle row
+		      -- col2(2) <= mem3_out; -- input last row			  
+			-- elsif (wr_en="001") then
+		      -- col2(0) <= i_pixel; --Input first row
+		      -- col2(1) <= mem2_out; -- input middle row
+		      -- col2(2) <= mem3_out; -- input last row
+			-- end if;
+		  -- elsif (col_first="100") then
+		    -- if (wr_en="100") then
+		      -- col3(0) <= mem1_out; --Input first row
+		      -- col3(1) <= mem2_out; -- input middle row
+		      -- col3(2) <= i_pixel; -- input last row
+			-- elsif (wr_en="010") then
+		      -- col3(0) <= mem1_out; --Input first row
+		      -- col3(1) <= i_pixel; -- input middle row
+		      -- col3(2) <= mem3_out; -- input last row			  
+			-- elsif (wr_en="001") then
+		      -- col3(0) <= i_pixel; --Input first row
+		      -- col3(1) <= mem2_out; -- input middle row
+		      -- col3(2) <= mem3_out; -- input last row
+			-- end if;
+		  -- end if;
+		  
+		-- end if;
+		
+		
+		-- Shift values of matrix
+		--1st col
+		a <= b;
+		h <= i;
+		g <= f;
+		--2nd col
+		b <= c;
+		i <= d;
+		f <= e;
+		
+		--Add value to 3rd conv column
+		if (wr_en="100") then
+		  --3rd col
+		  c <= mem1_out;
+		  d <= mem2_out;
+		  e <= i_pixel;
+		elsif(wr_en="010") then
+		  --3rd col
+		  c <= mem3_out;
+		  d <= mem1_out;
+		  e <= i_pixel;
+		elsif(wr_en="001") then
+		  --3rd col
+		  c <= mem2_out;
+		  d <= mem3_out;
+		  e <= i_pixel;
 		end if;
+		
 		  
 		  
 		  ---------------------------------------------------------------------------------------------
-		  -- Shift the one hot encoder left by 1 for next input
-		  col_first <= col_first(1 downto 0) & col_first(2);
+
+		-- Shift the one hot encoder left by 1 for next input
+		--col_first <= col_first(1 downto 0) & col_first(2);
+		 
+		--Set next address for next input, and check for column
+		if (address<255) then
+		  address <= address + 1;
+		elsif (address=255 and row=255) then --Last pixel
+		  address <= (others => '0');
+		  row <= (others => '0');
+		  --col_first <= "001";
+		elsif (address=255 and row<255) then --Last column, and not finished the last row
+		  address <= (others => '0');
+		  row <= row + 1;
+		  --col_first <= "001";
+		  wr_en <= wr_en(1 downto 0) & wr_en(2);
+		end if;
+		
+		if (address >= 2 and row >= 2) then
+		 dfd_start <= '1';
+		end if;
 		  
-		  --Set next address for next input, and check for column
-		  if (address<255) then
-		    address <= address + 1;
-		  elsif (address=255 and row=255) then --Last pixel
-		    address <= (others => '0');
-			row <= (others => '0');
-			col_first <= "001";
-		  elsif (address=255 and row<255) then --Last column, and not finished the last row
-		    address <= (others => '0');
-		    row <= row + 1;
-			wr_en <= wr_en(1 downto 0) & wr_en(2);
-		  end if;
-		  
-		  --Start DFD only once we're in 3rd column and 3rd row
-		  if (address >=2 and row >=2) then
-		    dfd_start <= '1';
-		  end if;
-		  
+	  end if;
+
+	  
+	  --Start DFD only once we're in 3rd column and 3rd row
+	  if (dfd_start = '1') then
+		dfd_start <= '0';
 	  end if;
 	  
 	  
@@ -513,8 +558,11 @@ begin
   end process;
   
   --Assign row and column ports
+  o_mode <= m_busy when (dfd_start='1') else
+			m_reset when (reset='1') else
+			m_idle when (o_valid='1');
   o_row <= row;
   o_col <= address;
-
+  o_valid <= edge_done;
     
 end architecture;

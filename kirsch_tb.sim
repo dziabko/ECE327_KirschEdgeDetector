@@ -35,10 +35,7 @@ if { $gui_mode } {
   # additional signals that are traced in all modes
   #
 
-	add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/col1
-	add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/col2
-	add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/col3
-	add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/wr_en
+	add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/i_en 
 	add wave -color "coral blue" -radix hex sim:/kirsch_tb/uut/Edge_Detector/i_en
   add wave                 sim:/kirsch_tb/o_mode
   add wave -radix unsigned sim:/kirsch_tb/o_row
@@ -46,14 +43,17 @@ if { $gui_mode } {
   add wave                 sim:/kirsch_tb/o_valid
   add wave                 sim:/kirsch_tb/o_edge
   add wave                 sim:/kirsch_tb/o_dir
+  add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/sum_1 
+  add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/op_sum_all/sum 
+  add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/op_sum_all/i_multiply
   #------------------------------------------------------
 
 }
 #----------------------------------------------------------------------
 # code to run in both command line and gui mode
 
-#run $run_time ns
-run 2 ms
+run $run_time ns
+#run 2 ms
 # run 11 ms
 
 #----------------------------------------------------------------------
