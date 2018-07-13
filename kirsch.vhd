@@ -13,6 +13,7 @@ entity three_x_sum is
     i_multiply : in std_logic;
     i_reset    : in std_logic;
     i_clear    : in std_logic;
+	i_sel	   : in std_logic (7 downto 0);
     o_result   : out unsigned (12 downto 0);
  --   o_overflow : out std_logic;
     clk        : in std_logic
@@ -20,6 +21,7 @@ entity three_x_sum is
 end entity;
 architecture sum_val of three_x_sum is 
   signal sum	: unsigned (12 downto 0);
+  signal i_b :	unsigned (8 downto 0); 
 begin
   process is
   begin 
@@ -27,11 +29,11 @@ begin
   if (i_reset = '1' OR i_clear = '1') then
       sum <= (others => '0');
   else
-      if (i_multiply='1') then
-          sum <= sum + shift_left(sum, 1);
-      else
-      	  sum <= sum + ("0000" & i_val);
-      end if;
+      -- if (i_multiply='1') then
+          -- sum <= sum + shift_left(sum, 1);
+      -- else
+      	  -- sum <= sum + ("0000" & i_val);
+      -- end if;
   end if;
   end process;
   o_result <= sum;
@@ -154,7 +156,7 @@ entity kirsch_edge_detector is
 end entity;
 
 architecture main_edge_detect of kirsch_edge_detector is 
-signal i_sel : std_logic_vector (2 downto 0);
+signal i_sel : std_logic_vector (7 downto 0);
 signal sum_1 : unsigned (8 downto 0);
 signal clear : std_logic;
 signal sum_all_inputs : unsigned (12 downto 0);
@@ -170,6 +172,7 @@ begin
 		i_clear => clear,
 		i_multiply => mul_en,
 		i_val => sum_1,
+		i_sel => i_sel,
 		o_result => sum_all_inputs,
 		clk => clk
 		);
@@ -204,26 +207,11 @@ begin
 		o_done <= '0';
 		i_sel <= (others => '0');
 	  else
-		case i_sel is 
-			when "000" =>
-			i_sel <= "001" when i_en = '1';
-			when "001" =>
-			i_sel <= "010";
-			when "010" =>
- 			i_sel <= "011";
-			when "011" => 
-			i_sel <= "100";
-			when "100" =>
-			i_sel <= "101";
-			when "101" =>
-			i_sel <= "110";
-			when "110" => 
-			i_sel <= "111";
-			o_done <= '1';
-			when others =>
-			o_done <= '0';
-			i_sel <= "000";
-		end case;
+		--Need shift i_sel left
+		--i_sel depicts how far along the inputs are along the stage
+		i_sel <= i_sel sll 1;
+		i_sel(0) <= i_valid;
+		o_done <= i_sel(7);
 	  end if;
 	end process;
 
