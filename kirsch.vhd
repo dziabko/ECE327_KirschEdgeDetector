@@ -21,20 +21,20 @@ architecture sum_val of three_x_sum is
   signal sum	: unsigned (12 downto 0);
   signal i_val_prev : unsigned (8 downto 0);
 begin
-  process is
-  variable op_a unsigned (12 downto 0);
-  variable op_b unsigned (12 downto 0);
+  calculate_sum : process 
+  variable op_a : unsigned (12 downto 0);
+  variable op_b : unsigned (12 downto 0);
   begin 
   wait until rising_edge(clk);
   i_val_prev <= i_val;
   if (i_reset = '1') then
       sum <= (others => '0');
       i_val_prev <= (others => '0');
-      op_a <= (others => '0');
-      op_b <= (others => '0');
+      op_a := (others => '0');
+      op_b := (others => '0');
   else
-      op_a <= shift_left(sum, 1)  when i_mux_sel_a = '1' else i_val;
-      op_b <= "0000" & i_val_prev when i_mux_sel_b = '1' else sum;
+      op_a := shift_left(sum, 1)  when i_mux_sel_a = '1' else "0000" & i_val;
+      op_b := "0000" & i_val_prev when i_mux_sel_b = '1' else sum;
       sum <= op_a + op_b;
   end if;
   end process;
@@ -63,15 +63,35 @@ end entity;
 
 architecture finalMax of kirsch_maxfinal is
   signal max_a : unsigned(9 downto 0);
+  signal max_a_register : unsigned (9 downto 0);
   signal max_dir : direction_ty;
+  signal max_dir_register : direction_ty;
 begin
-  final_max : process(clk, reset)
+  final_max : process
   variable sum : unsigned (9 downto 0); 
   begin
-    if (reset='1' OR i_clear = '1') then
+    wait until rising_edge(clk);
+    max_a_register <= max_a;
+    max_dir_register <= max_dir;
+    if (reset='1') then
 	  max_a <= (others => '0');
 	  max_dir <= (others => '0');
-    elsif(clk'EVENT and clk='1') then
+	  max_a_register <= (others => '0');
+	  max_dir_register <= (others => '0');
+    elsif (i_clear = '1') then
+	max_a_register <= max_a;
+	max_dir_register <= max_dir;
+	sum := ("0"&i_a) + ("00"&i_b);
+	if (sum > 0) then
+	        max_a <= sum;
+                max_dir <= i_dir;
+	else
+		max_a <= (others=>'0');
+		max_dir <= (others =>'0');
+	end if;
+    else 
+	max_a_register <= max_a;
+	max_dir_register <= max_dir;
 	  sum := ("0"&i_a) + ("00"&i_b);
 	  if ( sum > max_a ) then
 		max_a <= sum;
@@ -79,8 +99,8 @@ begin
 	  end if;
   end if;
   end process;
-  o_max_sum <= max_a;
-  o_dir <= max_dir;
+  o_max_sum <= max_a_register;
+  o_dir <= max_dir_register;
 end architecture;
 
 library ieee;
@@ -96,8 +116,8 @@ entity kirsch_edgecalc is
 	reset			: in std_logic;
 	i_sum_of_all		: in unsigned(12 downto 0);
 	i_max_of_sum		: in unsigned(9 downto 0);
-	i_hold_out		: in std_logic;
 	in_dir 		 	: in direction_ty;
+	i_out_en		: in std_logic;
 	o_edgeMax		: out signed(12 downto 0);
 	o_edge			: out std_logic;
 	o_dir 			: out direction_ty
@@ -105,6 +125,8 @@ entity kirsch_edgecalc is
 end entity;
 
 architecture edgeCalc of kirsch_edgecalc is
+--signal i_max_of_sum_register :unsigned (9 downto 0);
+--signal in_dir_register : direction_ty;
 begin
   final_max : process(clk, reset)
   variable max_sum_x8 : unsigned(12 downto 0);
@@ -114,15 +136,18 @@ begin
 	o_edge <= '0';
 	o_edgeMax <= (others=>'0');
 	o_dir <= dir_e;
-	elsif(clk'EVENT and clk='1' AND i_hold_out = '0') then
+	--i_max_of_sum_register <= (others => '0');
+	--in_dir_register <= (others => '0');
+	elsif(clk'EVENT and clk='1') then
 	  -- First shift the bottom input
-	  max_sum_x8 :=  shift_left("000" & i_max_of_sum, 3);
-	  
+	  max_sum_x8 :=  shift_left("000" & i_max_of_sum, 3);  
+	--  i_max_of_sum_register <= i_max_of_sum;
+ 	 -- in_dir_register <= in_dir;
 	  -- Then subtract input a from b
 	  final_edgecalc := signed(max_sum_x8) - signed(i_sum_of_all);
 	  
 	  -- Check if the final edge value is greater than 383 and set o_edge
-	  if (final_edgecalc > 383) then
+	  if (final_edgecalc > 383 AND i_out_en = '1') then
 	    o_edgeMax <= final_edgecalc;
 		o_edge <= '1';
 		o_dir <= in_dir;
@@ -163,17 +188,18 @@ signal clear : std_logic;
 signal sum_all_inputs : unsigned (12 downto 0);
 signal max_dir_inter : direction_ty;
 signal max_val_inter : unsigned (7 downto 0);
-signal mul_en: std_logic;
+--signal mul_en: std_logic;
 signal max_dir_final : direction_ty;
 signal max_val_final : unsigned (9 downto 0);
+signal three_add_mux_a : std_logic;
+signal three_add_mux_b : std_logic;
 begin
 	op_sum_all : entity work.three_x_sum(sum_val)
 	port map (
 		i_reset => reset,
-		i_clear => clear,
-		i_multiply => mul_en,
+		i_mux_sel_b => three_add_mux_b,
+		i_mux_sel_a => three_add_mux_a,
 		i_val => sum_1,
-		i_sel => i_sel,
 		o_result => sum_all_inputs,
 		clk => clk
 		);
@@ -195,12 +221,11 @@ begin
 		i_sum_of_all => sum_all_inputs,
 		i_max_of_sum => max_val_final,
 		in_dir => max_dir_final,
-		i_hold_out => o_done,
+		i_out_en => i_sel(6),
 		o_edgeMax => o_edge_max,
 		o_edge => o_edge,
 		o_dir => o_dir
 		);
-
 	cycle_states: process 
 	begin
 	wait until rising_edge(clk);
@@ -210,20 +235,21 @@ begin
 	  else
 		--Need shift i_sel left
 		--i_sel depicts how far along the inputs are along the stage
-		i_sel <= i_sel(6 downto 0) & i_valid;
-		o_done <= i_sel(7);
+		i_sel <= std_logic_vector(shift_left(unsigned(i_sel), 1));
+		i_sel(0) <= i_en;
+		o_done <= i_sel(6);
 	  end if;
 	end process;
 
-	clear_feedback_registers : process
+	clear_max_final_output : process
 	begin
 	wait until rising_edge(clk);
 	if (reset = '1') then
 		clear <= '0';
 	else
-		case i_sel is
-			when "000" =>
-			  clear <= '1' when i_en = '0' else '0';
+		case i_sel(0) is
+			when '1' =>
+			  clear <= '1';
 			when others =>
 			  clear <= '0';
 		end case;
@@ -236,14 +262,14 @@ begin
 	if (reset = '1') then
 		sum_1 <= (others => '0');
 	else 
-		case i_sel is 
-			when "000" =>
+		case i_sel(3 downto 0) is 
+			when "0001"  =>
 			sum_1 <= ("0"&a) + ("0"&h);
-			when "001" => 
+			when "0010" => 
 			sum_1 <= ("0"&b)+("0"&c);
-			when "010" =>
+			when "0100" =>
 			sum_1 <= ("0"&d) + ("0"&e);
-			when "011" =>
+			when "1000" =>
 			sum_1 <= ("0"&g) +("0"&f);
 			when others =>
 			sum_1 <= (others => '0');
@@ -251,15 +277,15 @@ begin
 	end if;	
 	end process;
 
-	max_dir_group : process
+	max_dir_group : process 
 	begin
 	wait until rising_edge(clk);
 	if (reset = '1') then
 		max_val_inter <= (others => '0');
 		max_dir_inter <= dir_e;
 	else
-		case i_sel is 
-		when "000" =>
+		case i_sel(3 downto 0) is 
+		when "0001" =>
 		  if (g >= b) then
 			max_dir_inter <= dir_w;
 			max_val_inter <= g;
@@ -267,7 +293,7 @@ begin
 			max_dir_inter <= dir_nw;
 			max_val_inter <= b;
 		  end if;
-		when "001" =>
+		when "0010" =>
 		  if (a >= d) then
 			max_dir_inter <= dir_n;
 			max_val_inter <= a;
@@ -275,7 +301,7 @@ begin
 			max_dir_inter <= dir_ne;
 			max_val_inter <= d;
 		  end if;
-		when "010" =>
+		when "0100" =>
 		  if (c >= f) then
 			max_dir_inter <= dir_e;
 			max_val_inter <= c;
@@ -283,7 +309,7 @@ begin
 			max_dir_inter <= dir_se;
 			max_val_inter <= f;
 		  end if;
-		when "011" =>
+		when "1000" =>
 		  if (e >= h) then
 			max_dir_inter <= dir_s;
 			max_val_inter <= e;
@@ -298,14 +324,33 @@ begin
 	end if;
 	end process;
 
-	set_sum_all_mult_en : process
+	set_control_three_x_sum : process
 	begin
 		wait until rising_edge(clk);
-		if (reset = '0' AND i_sel = "100") then
-			mul_en <= '1';
+		if (reset = '1') then
+			three_add_mux_a <= '0';
+			three_add_mux_b <= '0';
 		else
-			mul_en <= '0';
-		end if; 
+			case i_sel (4 downto 1) is
+				when "0001" => 
+					three_add_mux_a <= '0';
+					three_add_mux_b <= '1';
+				when "0010" =>
+					three_add_mux_a <= '0';
+					three_add_mux_b <= '0';
+				when "0100" =>
+					three_add_mux_a <= '0';
+					three_add_mux_b <= '0';
+				when "1000" =>
+					three_add_mux_a <= '1';
+					three_add_mux_b <= '0';
+				when others=>
+					three_add_mux_a <= '0';
+					three_add_mux_b <= '0';
+	
+			end case;					 
+					   
+		end if;
 	end process;	
 end architecture;
 --------------------------------------------------END EDGE DETECTION--------------------------------------------------
@@ -340,7 +385,7 @@ signal edge_done : std_logic;
 --row and address of our image
 signal address  : unsigned (7 downto 0);
 signal row 	: unsigned (7 downto 0);
-signal current_address : unsigned (7 downto 0);
+signal current_column : unsigned (7 downto 0);
 signal current_row : unsigned (7 downto 0);
 signal mode : mode_ty;
 -- Write enabled to write to mem
@@ -417,17 +462,28 @@ begin
    end if;
   end process;
  
-  
+  set_display_column_and_row : process
+  begin
+  wait until rising_edge(clk);
+	if (reset='1' or (current_column >= 254 AND current_row >= 254 and i_valid = '1')) then
+		current_column <= to_unsigned(1,current_column'length);
+		current_row <= to_unsigned(1,current_row'length);
+	elsif (edge_done = '1') then
+		current_column <= current_column + 1;
+		if (current_column >= 254) then
+			current_column <= to_unsigned(1, current_column'length);
+			current_row <= current_row + 1;
+		end if;
+	end if;
+  end process;
   kirsch_edgedetector : process(clk, reset)
   begin
     if (reset='1') then
-	  dfd_start <= '0';
 	  
 	  --Reset our wr_en, address, row
 	  wr_en <= "001";
 	  address <= (others => '0');
 	  row <= (others => '0');
-
 	  a <= (others => '0');
 	  b <= (others => '0');
 	  c <= (others => '0');
@@ -472,10 +528,6 @@ begin
 		  
 		  
 		  ---------------------------------------------------------------------------------------------
-
-		-- Shift the one hot encoder left by 1 for next input
-		current_address <= address;
-		current_row <= row; 
 		--Set next address for next input, and check for column
 		if (address<255) then
 		  address <= address + 1;
@@ -488,27 +540,15 @@ begin
 		  row <= row + 1;
 		  wr_en <= wr_en(1 downto 0) & wr_en(2);
 		end if;
-		
-		if (address >= 2 and row >= 2) then
-		 dfd_start <= '1';
-		end if;
-		  
 	  end if;
-
-	  
-	  --Start DFD only once we're in 3rd column and 3rd row
-	  if (dfd_start = '1') then
-		dfd_start <= '0';
-	  end if;
-	  
 	  
     end if;
   end process;
-  
+  dfd_start <= '1' when i_valid = '1' AND address >= 2 AND row >=2 else '0';
   --Assign row and column ports
   o_mode <= mode;
-  o_row <= current_row - 1 when (current_row > 0) else (others => '0');
-  o_col <= current_address - 1 when (current_address > 0) else (others => '0');
+  o_row <= current_row;
+  o_col <= current_column;
   o_valid <= edge_done;
     
 end architecture;

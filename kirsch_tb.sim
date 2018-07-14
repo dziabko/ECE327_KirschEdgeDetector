@@ -25,6 +25,15 @@ if { $gui_mode } {
     # add wave -color "coral"           -radix decimal  
     # add wave -color "slate blue"                      
 
+add wave -color "coral blue" -radix bin sim:/kirsch_tb/uut/Edge_Detector/i_sel
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/a 
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/b 
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/c 
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/d 
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/d 
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/f 
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/g 
+add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/h 
   } else {
     #------------------------------------------
     # signals that are traced in --chip and --logic mode
@@ -35,8 +44,6 @@ if { $gui_mode } {
   # additional signals that are traced in all modes
   #
 
-#	add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/i_en 
-#	add wave -color "coral blue" -radix hex sim:/kirsch_tb/uut/Edge_Detector/i_en
   add wave                 sim:/kirsch_tb/o_mode
   add wave -radix unsigned sim:/kirsch_tb/o_row
   add wave -radix unsigned sim:/kirsch_tb/o_col
@@ -46,6 +53,7 @@ if { $gui_mode } {
 #  add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/sum_1 
 #  add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/op_sum_all/sum 
 #  add wave -color "slate blue" -radix unsigned sim:/kirsch_tb/uut/Edge_Detector/op_sum_all/i_multiply
+
   #------------------------------------------------------
 
 }
