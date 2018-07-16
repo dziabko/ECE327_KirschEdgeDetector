@@ -63,9 +63,7 @@ end entity;
 
 architecture finalMax of kirsch_maxfinal is
   signal max_a : unsigned(9 downto 0);
-  --signal max_a_register : unsigned (9 downto 0);
   signal max_dir : direction_ty;
-  --signal max_dir_register : direction_ty;
 begin
   final_max : process
   variable sum : unsigned (9 downto 0); 
@@ -78,17 +76,6 @@ begin
 	  max_dir <= (others => '0');
 	  o_max_sum <= (others => '0');
 	  o_dir <= (others => '0');
-    -- elsif (i_clear = '1') then
-	  -- max_a_register <= max_a;
-	  -- max_dir_register <= max_dir;
-	  -- sum := ("0"&i_a) + ("00"&i_b);
-	  -- if (sum > 0) then
-	    -- max_a <= sum;
-        -- max_dir <= i_dir;
-	  -- else
-	    -- max_a <= (others=>'0');
-	    -- max_dir <= (others =>'0');
-	  -- end if;
     else
 	  --Move reg_a to next reg
 	  o_max_sum <= max_a;
@@ -105,8 +92,6 @@ begin
 	  
     end if;
   end process;
-  --o_max_sum <= max_a_register;
-  --o_dir <= max_dir_register;
 end architecture;
 
 library ieee;
@@ -124,15 +109,12 @@ entity kirsch_edgecalc is
 	i_max_of_sum		: in unsigned(9 downto 0);
 	in_dir 		 	: in direction_ty;
 	i_out_en		: in std_logic;
-	--o_edgeMax		: out signed(12 downto 0);
 	o_edge			: out std_logic;
 	o_dir 			: out direction_ty
   );
 end entity;
 
 architecture edgeCalc of kirsch_edgecalc is
---signal i_max_of_sum_register :unsigned (9 downto 0);
---signal in_dir_register : direction_ty;
 begin
   final_max : process(clk, reset)
   variable max_sum_x8 : unsigned(12 downto 0);
@@ -140,25 +122,18 @@ begin
   begin
     if (reset='1') then
 	o_edge <= '0';
-	--o_edgeMax <= (others=>'0');
 	o_dir <= dir_e;
-	--i_max_of_sum_register <= (others => '0');
-	--in_dir_register <= (others => '0');
 	elsif(clk'EVENT and clk='1') then
 	  -- First shift the bottom input
 	  max_sum_x8 :=  shift_left("000" & i_max_of_sum, 3);  
-	--  i_max_of_sum_register <= i_max_of_sum;
- 	 -- in_dir_register <= in_dir;
 	  -- Then subtract input a from b
 	  final_edgecalc := signed(max_sum_x8) - signed(i_sum_of_all);
 	  
 	  -- Check if the final edge value is greater than 383 and set o_edge
 	  if (final_edgecalc > 383 AND i_out_en = '1') then
-	    --o_edgeMax <= final_edgecalc;
 		o_edge <= '1';
 		o_dir <= in_dir;
 	  else
-	    --o_edgeMax <= (others=>'0');
 		o_edge <= '0';
 		o_dir <= dir_e;
 	  end if;
@@ -181,7 +156,6 @@ entity kirsch_edge_detector is
 	i_en		: in std_logic;
 	a,b,c,d,e,f,g,h	: in unsigned (7 downto 0);
 	o_edge		: out std_logic;
-	--o_edge_max	: out signed (12 downto 0);
 	o_dir		: out direction_ty;
 	o_done		: out std_logic
      );
@@ -194,7 +168,6 @@ signal clear : std_logic;
 signal sum_all_inputs : unsigned (12 downto 0);
 signal max_dir_inter : direction_ty;
 signal max_val_inter : unsigned (7 downto 0);
---signal mul_en: std_logic;
 signal max_dir_final : direction_ty;
 signal max_val_final : unsigned (9 downto 0);
 signal three_add_mux_a : std_logic;
@@ -228,7 +201,6 @@ begin
 		i_max_of_sum => max_val_final,
 		in_dir => max_dir_final,
 		i_out_en => i_sel(6),
-		--o_edgeMax => o_edge_max,
 		o_edge => o_edge,
 		o_dir => o_dir
 		);
@@ -275,11 +247,8 @@ begin
 			sum_1 <= ("0"&b)+("0"&c);
 			when "0100" =>
 			sum_1 <= ("0"&d) + ("0"&e);
-			--when "1000" =>
 			when others =>
 			sum_1 <= ("0"&g) +("0"&f);
-			--when others =>
-			--sum_1 <= (others => '0');
 		end case;
 	end if;	
 	end process;
@@ -291,8 +260,6 @@ begin
 		max_val_inter <= (others => '0');
 		max_dir_inter <= dir_e;
 		
-		-- three_add_mux_a <= '0';
-		-- three_add_mux_b <= '0';
 	else
 		case i_sel(3 downto 0) is 
 		when "0001" =>
@@ -303,9 +270,6 @@ begin
 			max_dir_inter <= dir_nw;
 			max_val_inter <= b;
 		  end if;
-		  
-			-- three_add_mux_a <= '1';
-			-- three_add_mux_b <= '0';
 		when "0010" =>
 		  if (a >= d) then
 			max_dir_inter <= dir_n;
@@ -314,9 +278,6 @@ begin
 			max_dir_inter <= dir_ne;
 			max_val_inter <= d;
 		  end if;
-		  
-		  	-- three_add_mux_a <= '0';
-			-- three_add_mux_b <= '1';
 		when "0100" =>
 		  if (c >= f) then
 			max_dir_inter <= dir_e;
@@ -326,8 +287,6 @@ begin
 			max_val_inter <= f;
 		  end if;
 		  
-		  	-- three_add_mux_a <= '0';
-			-- three_add_mux_b <= '0';
 		when "1000" =>
 		  if (e >= h) then
 			max_dir_inter <= dir_s;
@@ -336,15 +295,10 @@ begin
 			max_dir_inter <= dir_sw;
 			max_val_inter <= h;
 		  end if;
-		  
-		  -- three_add_mux_a <= '0';
-		  -- three_add_mux_b <= '0';
 		when others =>
 			max_val_inter <= (others => '0');
 			max_dir_inter <= dir_e; 
 			
-			-- three_add_mux_a <= '0';
-		    -- three_add_mux_b <= '0';
 		end case;
 	end if;
 	end process;
@@ -356,24 +310,6 @@ begin
 			three_add_mux_a <= '0';
 			three_add_mux_b <= '0';
 		else
-			-- case i_sel (4 downto 1) is
-				-- when "0001" => 
-					-- three_add_mux_a <= '0';
-					-- three_add_mux_b <= '1';
-				-- when "0010" =>
-					-- three_add_mux_a <= '0';
-					-- three_add_mux_b <= '0';
-				-- when "0100" =>
-					-- three_add_mux_a <= '0';
-					-- three_add_mux_b <= '0';
-				-- when "1000" =>
-					-- three_add_mux_a <= '1';
-					-- three_add_mux_b <= '0';
-				-- when others=>
-					-- three_add_mux_a <= '0';
-					-- three_add_mux_b <= '0';
-	
-			-- end case;					 
 			three_add_mux_b <= i_sel(1);
 			three_add_mux_a <= i_sel(4);
 					   
@@ -425,10 +361,6 @@ signal mem2_out : unsigned(7 downto 0);
 signal mem3_out : unsigned(7 downto 0);
 
 -- One hot encoding for col input
---signal col_first : std_logic_vector(2 downto 0) := "001";
-
---Temp o_edge_max
---signal o_edge_max : signed(12 downto 0);
 
 -- Signal detect DFD start
 signal dfd_start : std_logic := '0';
@@ -473,7 +405,6 @@ begin
 		b => b, f => f,
 		c => c, d => d, e => e,
 		o_edge => o_edge,
-		--o_edge_max => o_edge_max,
 		o_dir => o_dir,
 		i_en => dfd_start,
 		o_done => edge_done
@@ -562,7 +493,6 @@ begin
 		elsif (address=255 and row=255) then --Last pixel
 		  address <= (others => '0');
 		  row <= (others => '0');
-		  --col_first <= "001";
 		elsif (address=255 and row<255) then --Last column, and not finished the last row
 		  address <= (others => '0');
 		  row <= row + 1;
